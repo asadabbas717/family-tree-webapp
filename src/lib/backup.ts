@@ -21,9 +21,7 @@ export function backupFilename(timestamp = new Date()): string {
   return `family-tree-backup-${timestamp.toISOString().slice(0, 10)}.json`;
 }
 
-export type ImportResult =
-  | { ok: true; data: FamilyTreeData }
-  | { ok: false; error: string };
+export type ImportResult = { ok: true; data: FamilyTreeData } | { ok: false; error: string };
 
 export function importTree(text: string): ImportResult {
   try {
@@ -43,12 +41,19 @@ export function importTree(text: string): ImportResult {
   } catch (error) {
     return {
       ok: false,
-      error: error instanceof Error ? `The file is not valid JSON: ${error.message}` : 'The file is not valid JSON.',
+      error:
+        error instanceof Error
+          ? `The file is not valid JSON: ${error.message}`
+          : 'The file is not valid JSON.',
     };
   }
 }
 
-export function downloadTextFile(contents: string, filename: string, mime = 'application/json'): void {
+export function downloadTextFile(
+  contents: string,
+  filename: string,
+  mime = 'application/json',
+): void {
   const blob = new Blob([contents], { type: mime });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');

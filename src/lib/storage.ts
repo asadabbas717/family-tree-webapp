@@ -8,6 +8,7 @@ export const THEME_STORAGE_KEY = 'family-tree-webapp:theme';
 export type LoadResult =
   | { status: 'empty' }
   | { status: 'ok'; data: FamilyTreeData }
+  | { status: 'unavailable'; error: string }
   | { status: 'corrupt'; raw: string; error: string };
 
 export interface StorageLike {
@@ -39,19 +40,47 @@ export function parseStoredFamilyTree(raw: string | null): LoadResult {
 }
 
 export class LocalFamilyRepository {
+  private expectedRaw: string | null | undefined;
   constructor(private readonly storage: StorageLike) {}
 
   load(): LoadResult {
-    return parseStoredFamilyTree(this.storage.getItem(DATA_STORAGE_KEY));
+    try {
+      this.expectedRaw = this.storage.getItem(DATA_STORAGE_KEY);
+      return parseStoredFamilyTree(this.expectedRaw);
+    } catch {
+      return {
+        status: 'unavailable',
+        error:
+          'Browser storage is unavailable. Changes are kept in memory only; export a backup before closing this page.',
+      };
+    }
+  }
+
+  private checkConflict(): void {
+    const current = this.storage.getItem(DATA_STORAGE_KEY);
+    if (this.expectedRaw === undefined || current !== this.expectedRaw) {
+      throw new Error(
+        'Saved data changed in another tab or could not be read. Export your current tree, then reload before saving or resetting.',
+      );
+    }
   }
 
   save(data: FamilyTreeData): void {
-    this.storage.setItem(DATA_STORAGE_KEY, serializeFamilyTree(data));
+    this.checkConflict();
+    const raw = serializeFamilyTree(data);
+    this.storage.setItem(DATA_STORAGE_KEY, raw);
+    this.expectedRaw = raw;
   }
 
   clear(): void {
+    this.checkConflict();
     this.storage.removeItem(DATA_STORAGE_KEY);
-    this.storage.removeItem(UI_STORAGE_KEY);
+    this.expectedRaw = null;
+    try {
+      this.storage.removeItem(UI_STORAGE_KEY);
+    } catch {
+      // Clearing optional presentation state must not misreport family deletion.
+    }
   }
 
   loadUiState(): UiState {
@@ -80,5 +109,10 @@ export class LocalFamilyRepository {
 
 export function getBrowserRepository(): LocalFamilyRepository | null {
   if (typeof window === 'undefined') return null;
-  return new LocalFamilyRepository(window.localStorage);
+  // Access the localStorage property inside repository error handling: the getter itself can throw.
+  return new LocalFamilyRepository({
+    getItem: (key) => window.localStorage.getItem(key),
+    setItem: (key, value) => window.localStorage.setItem(key, value),
+    removeItem: (key) => window.localStorage.removeItem(key),
+  });
 }

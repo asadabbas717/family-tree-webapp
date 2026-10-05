@@ -51,7 +51,9 @@ describe('family domain operations', () => {
     const next = addPartnerRelationship(tree, ids[0]!, ids[1]!, 'spouses');
     expect(Object.keys(next.people)).toHaveLength(2);
     expect(Object.keys(next.partnerRelationships)).toHaveLength(1);
-    expect(() => addPartnerRelationship(next, ids[1]!, ids[0]!, 'partners')).toThrow(FamilyDomainError);
+    expect(() => addPartnerRelationship(next, ids[1]!, ids[0]!, 'partners')).toThrow(
+      FamilyDomainError,
+    );
   });
 
   it('adds children and traverses descendants', () => {

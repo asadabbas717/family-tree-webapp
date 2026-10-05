@@ -38,18 +38,30 @@ function PersonEditorForm({ person, onClose }: { person: Person; onClose: () => 
       setError(validation);
       return;
     }
-    editPerson(person.id, draft);
-    onClose();
+    try {
+      editPerson(person.id, draft);
+      onClose();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Changes could not be saved.');
+    }
   };
 
   return (
     <Modal open title="Edit family member" onClose={onClose}>
       <form onSubmit={submit} noValidate>
-        {error ? <div className="form-error" role="alert">{error}</div> : null}
+        {error ? (
+          <div className="form-error" role="alert">
+            {error}
+          </div>
+        ) : null}
         <PersonFields value={draft} onChange={setDraft} autofocus />
         <div className="dialog-actions">
-          <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
-          <button className="primary-button" type="submit">Save changes</button>
+          <button className="secondary-button" type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="primary-button" type="submit">
+            Save changes
+          </button>
         </div>
       </form>
     </Modal>

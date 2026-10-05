@@ -39,15 +39,21 @@ export function Toolbar({ theme, onToggleTheme, onOpenData }: ToolbarProps) {
   return (
     <header className="app-toolbar">
       <div className="brand-block">
-        <div className="brand-mark" aria-hidden="true">FT</div>
+        <div className="brand-mark" aria-hidden="true">
+          FT
+        </div>
         <div>
           <strong>Family Tree</strong>
-          <span>{count} {count === 1 ? 'person' : 'people'} · local only</span>
+          <span>
+            {count} {count === 1 ? 'person' : 'people'} · local only
+          </span>
         </div>
       </div>
 
       <div className="search-wrap">
-        <label className="sr-only" htmlFor="family-search">Search family members</label>
+        <label className="sr-only" htmlFor="family-search">
+          Search family members
+        </label>
         <input
           id="family-search"
           ref={inputRef}
@@ -58,30 +64,39 @@ export function Toolbar({ theme, onToggleTheme, onOpenData }: ToolbarProps) {
           autoComplete="off"
         />
         {query.trim() ? (
-          <div className="search-results" role="listbox" aria-label="Family search results">
-            {results.length ? results.map((person) => (
-              <button
-                key={person.id}
-                type="button"
-                role="option"
-                onClick={() => {
-                  focusPerson(person.id);
-                  setQuery('');
-                }}
-              >
-                <strong>{person.name}</strong>
-                <span>{person.birthDate ?? 'Birth unknown'}</span>
-              </button>
-            )) : <p>No family member found.</p>}
+          <div className="search-results" role="group" aria-label="Family search results">
+            {results.length ? (
+              results.map((person) => (
+                <button
+                  key={person.id}
+                  type="button"
+                  onClick={() => {
+                    focusPerson(person.id);
+                    setQuery('');
+                  }}
+                >
+                  <strong>{person.name}</strong>
+                  <span>{person.birthDate ?? 'Birth unknown'}</span>
+                </button>
+              ))
+            ) : (
+              <p>No family member found.</p>
+            )}
           </div>
         ) : null}
       </div>
 
       <nav className="toolbar-actions" aria-label="Application actions">
         <button className="toolbar-button" type="button" onClick={onOpenData}>
-          <span className="desktop-label">Backup & data</span><span className="mobile-label">Data</span>
+          <span className="desktop-label">Backup & data</span>
+          <span className="mobile-label">Data</span>
         </button>
-        <button className="toolbar-button" type="button" onClick={onToggleTheme} aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}>
+        <button
+          className="toolbar-button"
+          type="button"
+          onClick={onToggleTheme}
+          aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} theme`}
+        >
           {theme === 'light' ? 'Dark' : 'Light'}
         </button>
       </nav>

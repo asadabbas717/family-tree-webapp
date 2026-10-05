@@ -83,7 +83,7 @@ export default function App() {
         Your family tree is stored locally in this browser unless you explicitly export it.
       </div>
 
-      <DataDialog open={dataOpen} onClose={() => setDataOpen(false)} />
+      {dataOpen ? <DataDialog open onClose={() => setDataOpen(false)} /> : null}
       <PersonEditor personId={editPersonId} onClose={() => setEditPersonId(null)} />
       <RelativeDialog
         anchorId={relativeDialog?.anchorId ?? null}

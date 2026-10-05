@@ -1,10 +1,8 @@
 # Family Tree Web App
 
-A deploy-ready, local-first interactive family tree for recording only the branches a user chooses to create. The application starts with any two people, supports multiple spouse/partner relationships, validates ancestry links, and keeps family information in the current browser unless the user explicitly exports a JSON backup.
+A browser-local interactive family tree for recording only the branches a user chooses to create. The application starts with any two people, supports multiple spouse/partner relationships, validates ancestry links, and keeps family information in the current browser unless the user explicitly exports a JSON backup.
 
 ## Screenshots
-
-> Add screenshots after the first local/deployed visual review.
 
 - Desktop tree canvas — `docs/screenshots/desktop-tree.png`
 - Mobile family details — `docs/screenshots/mobile-details.png`
@@ -37,7 +35,7 @@ A deploy-ready, local-first interactive family tree for recording only the branc
 ## Tech Stack
 
 - React 19
-- TypeScript 6.0 (latest line officially supported by the current typescript-eslint toolchain)
+- TypeScript 6.0
 - Vite 8
 - `@xyflow/react` 12 for interactive graph rendering
 - `@dagrejs/dagre` 3 for automatic positioning
@@ -155,10 +153,9 @@ Family_Tree_WebApp/
 
 ## Prerequisites — Windows 11 + Git Bash
 
-Check your environment from the real project directory:
+Use a supported Node.js release >=22.12 (Node 24 is used in CI), npm, and a modern browser. After cloning, open a terminal in the repository root.
 
 ```bash
-cd /c/Users/Waheed/Desktop/Web/Family_Tree_WebApp
 pwd
 ls -la
 git status
@@ -166,13 +163,12 @@ node --version
 npm --version
 ```
 
-Use Node.js 20.19+ or 22.12+ (Vite 8 requirement). Do not create a directory containing `&#x20;`, an escaped underscore, or a trailing space.
+No environment variables, backend, API keys, or .env file are needed.
 
 ## Local Development
 
 ```bash
-cd /c/Users/Waheed/Desktop/Web/Family_Tree_WebApp
-npm install
+npm ci
 npm run dev
 ```
 
@@ -183,12 +179,10 @@ Vite prints the local URL, normally similar to `http://localhost:5173/`.
 Run all quality gates before pushing or deploying:
 
 ```bash
-npm run lint
-npm test
-npm run build
+npm run check
 ```
 
-Optional formatting check:
+Individual formatting check:
 
 ```bash
 npm run format:check
@@ -247,44 +241,6 @@ Export first if the tree may be needed later.
 **Your family tree is stored locally in this browser unless you explicitly export it.**
 
 Version 1 does not send family data to a server and does not include analytics or third-party tracking. `localStorage` is persistent browser storage, not encrypted storage. Clearing site/browser data, changing browsers, reinstalling the operating system, or losing the device can remove the tree. Export JSON backups regularly.
-
-## GitHub Setup
-
-First inspect the existing repository instead of blindly reinitializing it:
-
-```bash
-cd /c/Users/Waheed/Desktop/Web/Family_Tree_WebApp
-git status
-git remote -v
-```
-
-If it is already a repository, do **not** run `git init` again.
-
-After verification:
-
-```bash
-git add .
-git status
-git commit -m "Build initial interactive family tree application"
-```
-
-If GitHub CLI is installed and authenticated and there is no conflicting remote:
-
-```bash
-gh auth status
-gh repo create family-tree-webapp --public --source=. --remote=origin --push
-```
-
-Otherwise create an empty public repository named `family-tree-webapp` on GitHub, then inspect remotes again and add the correct one only if `origin` does not already exist:
-
-```bash
-git branch -M main
-git remote -v
-git remote add origin https://github.com/YOUR_USERNAME/family-tree-webapp.git
-git push -u origin main
-```
-
-Never overwrite an existing `origin` until you have inspected where it points.
 
 ## Cloudflare Pages Deployment
 
@@ -358,3 +314,19 @@ Remember that local browser data on `localhost` and data on the deployed `pages.
 3. Better dense-tree layout using relationship hubs/ELK when trees become very complex.
 4. Optional photo attachments stored safely with an IndexedDB/media strategy.
 5. Private invitations, collaborative editing, and role-based access.
+
+## Engineering documentation
+
+- [Engineering audit](ENGINEERING_AUDIT.md): findings, before/after scores, verification and remaining risks.
+- [Architecture and decisions](docs/architecture.md): module boundaries and current trade-offs.
+- [Testing](docs/testing.md): automated coverage and manual release checks.
+- [Security](docs/security.md): data privacy, import validation and dependency checks.
+- [Deployment](docs/deployment.md): static hosting, backup and rollback procedure.
+
+The quality workflow runs clean dependency installation, formatting, lint, tests, TypeScript/build and high-severity dependency auditing. No changes are deployed automatically.
+
+### Persistence and concurrency limits
+
+Blocked browser storage leaves the app usable in memory with a warning. Export before closing it. A stale tab is prevented from saving or resetting after it detects a changed saved value; export its in-memory tree and reload. This check is not an atomic cross-tab transaction: use one editing tab at a time. There is no merge or synchronization engine.
+
+Backup files above 2 MB require an additional Read large backup confirmation before reading and validating them. Export has no size cap. Large graphs have no established performance guarantee. Year-only dates describe uncertain chronology; age calculated from partial dates is approximate.

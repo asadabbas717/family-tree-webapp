@@ -1,0 +1,11 @@
+# Deployment and operations
+
+Build from the committed lockfile with a supported Node release (CI uses Node 24): `npm ci`, `npm run check`, `npm audit --audit-level=high`. The build emits `dist/`; serve its contents over HTTPS. Vite preview is a local verification server, not the production hosting service. No environment variables or backend secrets are needed. Build source maps remain enabled for debugging; they contain application source, so do not add secrets to client code.
+
+For Cloudflare Pages, use repository root, `npm run build`, and output `dist`. `public/_headers` is copied into the output and is interpreted by Cloudflare; another host must configure equivalent response headers. Verify the deployed CSP and assets with browser developer tools or HTTP response inspection. [Cloudflare header documentation](https://developers.cloudflare.com/pages/configuration/headers/) describes host behavior. CI validates code and dependencies but does not publish the site.
+
+Before release, complete the manual workflow checks in [testing.md](testing.md). The current audit does not certify deployed HTTPS/header behavior or screen-reader usability. Keep the prior deployment artifact/revision available. Roll back by deploying that known-good revision; no database migrations are required. Never roll back to code that cannot read the saved schema version. Do not reset users' local storage as a deployment step.
+
+Users should export JSON before major edits, clearing browser data or moving devices. Verify recovery by importing a backup on a separate disposable origin/browser profile and comparing people/links. Origin changes (including port, hostname or protocol) do not carry local data over automatically. Reset requires DELETE; corrupt data can be downloaded raw before confirmed reset. Storage failure keeps the current in-memory tree available for export, while a detected external change blocks writes until export/reload.
+
+There is no server backup, asset-cache/service worker, data synchronization, automatic restore or central log collection. Files above 2 MB require a separate Read large backup confirmation before validation; test large-backup restore and layout on the intended device. Use one editing tab at a time.

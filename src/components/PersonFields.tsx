@@ -8,7 +8,12 @@ interface PersonFieldsProps {
   autofocus?: boolean;
 }
 
-export function PersonFields({ value, onChange, nameLabel = 'Full name', autofocus = false }: PersonFieldsProps) {
+export function PersonFields({
+  value,
+  onChange,
+  nameLabel = 'Full name',
+  autofocus = false,
+}: PersonFieldsProps) {
   const update = <K extends keyof PersonDraft>(key: K, next: PersonDraft[K]) => {
     onChange({ ...value, [key]: next });
   };
@@ -18,7 +23,9 @@ export function PersonFields({ value, onChange, nameLabel = 'Full name', autofoc
   return (
     <div className="form-grid">
       <label className="field field-span-2">
-        <span>{nameLabel} <b aria-hidden="true">*</b></span>
+        <span>
+          {nameLabel} <b aria-hidden="true">*</b>
+        </span>
         <input
           autoFocus={autofocus}
           required
@@ -32,7 +39,10 @@ export function PersonFields({ value, onChange, nameLabel = 'Full name', autofoc
 
       <label className="field">
         <span>Gender</span>
-        <select value={value.gender} onChange={(event) => update('gender', event.target.value as PersonDraft['gender'])}>
+        <select
+          value={value.gender}
+          onChange={(event) => update('gender', event.target.value as PersonDraft['gender'])}
+        >
           <option value="unspecified">Unspecified</option>
           <option value="male">Male</option>
           <option value="female">Female</option>
@@ -70,7 +80,10 @@ export function PersonFields({ value, onChange, nameLabel = 'Full name', autofoc
       {hasDatePreview ? (
         <div className="field-date-summary field-span-2" aria-live="polite">
           <span>Automatic display</span>
-          <strong>{age ? `${age} · ` : ''}{displayLifeSpan(value.birthDate, value.deathDate)}</strong>
+          <strong>
+            {age ? `${age} · ` : ''}
+            {displayLifeSpan(value.birthDate, value.deathDate)}
+          </strong>
         </div>
       ) : null}
 

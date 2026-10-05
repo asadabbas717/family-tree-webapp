@@ -57,7 +57,10 @@ function RelativeDialogForm({
       setError(validation);
       return;
     }
-    if ((partnerType === 'custom' || parentChildType === 'custom') && !customLabel.trim()) {
+    if (
+      (kind === 'partner' ? partnerType === 'custom' : parentChildType === 'custom') &&
+      !customLabel.trim()
+    ) {
       setError('Describe the custom relationship.');
       return;
     }
@@ -82,7 +85,11 @@ function RelativeDialogForm({
       onClose={onClose}
     >
       <form onSubmit={submit} noValidate>
-        {error ? <div className="form-error" role="alert">{error}</div> : null}
+        {error ? (
+          <div className="form-error" role="alert">
+            {error}
+          </div>
+        ) : null}
 
         <label className="field">
           <span>Relationship</span>
@@ -93,12 +100,20 @@ function RelativeDialogForm({
           </select>
         </label>
 
-        <PersonFields value={draft} onChange={setDraft} nameLabel="Relative's full name" autofocus />
+        <PersonFields
+          value={draft}
+          onChange={setDraft}
+          nameLabel="Relative's full name"
+          autofocus
+        />
 
         {kind === 'partner' ? (
           <label className="field">
             <span>Partner relationship</span>
-            <select value={partnerType} onChange={(event) => setPartnerType(event.target.value as PartnerType)}>
+            <select
+              value={partnerType}
+              onChange={(event) => setPartnerType(event.target.value as PartnerType)}
+            >
               <option value="spouses">Spouses</option>
               <option value="partners">Partners</option>
               <option value="co-parents">Co-parents</option>
@@ -112,7 +127,10 @@ function RelativeDialogForm({
         ) : (
           <label className="field">
             <span>Parent-child relationship</span>
-            <select value={parentChildType} onChange={(event) => setParentChildType(event.target.value as ParentChildType)}>
+            <select
+              value={parentChildType}
+              onChange={(event) => setParentChildType(event.target.value as ParentChildType)}
+            >
               <option value="biological">Biological / standard</option>
               <option value="adopted">Adopted</option>
               <option value="step">Stepchild</option>
@@ -125,10 +143,15 @@ function RelativeDialogForm({
         {kind === 'child' && partners.length > 0 ? (
           <label className="field">
             <span>Also add as parent</span>
-            <select value={secondParentId} onChange={(event) => setSecondParentId(event.target.value)}>
+            <select
+              value={secondParentId}
+              onChange={(event) => setSecondParentId(event.target.value)}
+            >
               <option value="">Only {anchor.name}</option>
               {partners.map((partner) => (
-                <option key={partner.id} value={partner.id}>{partner.name}</option>
+                <option key={partner.id} value={partner.id}>
+                  {partner.name}
+                </option>
               ))}
             </select>
             <small>If this child belongs to a couple, choose the other parent here.</small>
@@ -139,13 +162,21 @@ function RelativeDialogForm({
         (parentChildType === 'custom' && kind !== 'partner') ? (
           <label className="field">
             <span>Custom relationship</span>
-            <input maxLength={200} value={customLabel} onChange={(event) => setCustomLabel(event.target.value)} />
+            <input
+              maxLength={200}
+              value={customLabel}
+              onChange={(event) => setCustomLabel(event.target.value)}
+            />
           </label>
         ) : null}
 
         <div className="dialog-actions">
-          <button className="secondary-button" type="button" onClick={onClose}>Cancel</button>
-          <button className="primary-button" type="submit">Add relative</button>
+          <button className="secondary-button" type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="primary-button" type="submit">
+            Add relative
+          </button>
         </div>
       </form>
     </Modal>

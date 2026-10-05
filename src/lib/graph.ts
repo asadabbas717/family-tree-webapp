@@ -60,10 +60,17 @@ class DisjointSet {
 }
 
 function personSort(a: Person, b: Person): number {
-  return a.createdAt.localeCompare(b.createdAt) || a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+  return (
+    a.createdAt.localeCompare(b.createdAt) ||
+    a.name.localeCompare(b.name) ||
+    a.id.localeCompare(b.id)
+  );
 }
 
-function buildUnits(tree: FamilyTreeData, visible: Set<string>): {
+function buildUnits(
+  tree: FamilyTreeData,
+  visible: Set<string>,
+): {
   units: FamilyUnit[];
   unitByPerson: Map<string, string>;
 } {
@@ -128,7 +135,7 @@ function buildUnits(tree: FamilyTreeData, visible: Set<string>): {
     const minSlot = Math.min(...slots);
     const maxSlot = Math.max(...slots);
     const width = NODE_WIDTH + (maxSlot - minSlot) * UNIT_GAP;
-    const unitId = `unit_${[...sortedMembers].sort().join('_')}`;
+    const unitId = `unit_${JSON.stringify([...sortedMembers].sort())}`;
 
     ordered.forEach((personId) => unitByPerson.set(personId, unitId));
     units.push({ id: unitId, members: ordered, slotByPerson, minSlot, maxSlot, width });
@@ -213,28 +220,33 @@ export function buildFlowGraph(
   }
 
   const partnerEdges: Edge[] = Object.values(tree.partnerRelationships)
-    .filter((relationship) => visible.has(relationship.person1Id) && visible.has(relationship.person2Id))
+    .filter(
+      (relationship) => visible.has(relationship.person1Id) && visible.has(relationship.person2Id),
+    )
     .flatMap((relationship) => {
       const first = personCenters.get(relationship.person1Id);
       const second = personCenters.get(relationship.person2Id);
       if (!first || !second) return [];
       const leftId = first.x <= second.x ? relationship.person1Id : relationship.person2Id;
-      const rightId = leftId === relationship.person1Id ? relationship.person2Id : relationship.person1Id;
-      return [{
-        id: `partner_${relationship.id}`,
-        source: leftId,
-        target: rightId,
-        sourceHandle: 'partner-right',
-        targetHandle: 'partner-left',
-        type: 'straight',
-        className: 'edge-partner',
-        label: relationship.customLabel || friendlyPartnerType(relationship.type),
-        labelShowBg: true,
-        labelBgPadding: [6, 4] as [number, number],
-        labelBgBorderRadius: 8,
-        style: { strokeWidth: 2.5 },
-        zIndex: 2,
-      } satisfies Edge];
+      const rightId =
+        leftId === relationship.person1Id ? relationship.person2Id : relationship.person1Id;
+      return [
+        {
+          id: `partner_${relationship.id}`,
+          source: leftId,
+          target: rightId,
+          sourceHandle: 'partner-right',
+          targetHandle: 'partner-left',
+          type: 'straight',
+          className: 'edge-partner',
+          label: relationship.customLabel || friendlyPartnerType(relationship.type),
+          labelShowBg: true,
+          labelBgPadding: [6, 4] as [number, number],
+          labelBgBorderRadius: 8,
+          style: { strokeWidth: 2.5 },
+          zIndex: 2,
+        } satisfies Edge,
+      ];
     });
 
   const parentsByChild = new Map<string, string[]>();
@@ -248,7 +260,7 @@ export function buildFlowGraph(
   const childrenByParentSet = new Map<string, { parents: string[]; children: string[] }>();
   for (const [childId, parentIds] of parentsByChild) {
     const parents = [...parentIds].sort();
-    const key = parents.join('|');
+    const key = JSON.stringify(parents);
     const entry = childrenByParentSet.get(key) ?? { parents, children: [] };
     entry.children.push(childId);
     childrenByParentSet.set(key, entry);
@@ -264,8 +276,11 @@ export function buildFlowGraph(
     if (parentPositions.length === 0) continue;
 
     const junctionId = `junction_${junctionIndex++}_${entry.parents.join('_')}`;
-    const centerX = parentPositions.reduce((sum, position) => sum + position.x, 0) / parentPositions.length;
-    const parentBottom = Math.max(...parentPositions.map((position) => position.y + NODE_HEIGHT / 2));
+    const centerX =
+      parentPositions.reduce((sum, position) => sum + position.x, 0) / parentPositions.length;
+    const parentBottom = Math.max(
+      ...parentPositions.map((position) => position.y + NODE_HEIGHT / 2),
+    );
     const junctionCenterY = parentBottom + JUNCTION_OFFSET;
 
     nodes.push({

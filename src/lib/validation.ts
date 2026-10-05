@@ -1,4 +1,4 @@
-import { isValidFamilyDate, comparableDate } from './date';
+import { validateLifeDates } from './date';
 import {
   SCHEMA_VERSION,
   type FamilyTreeData,
@@ -8,8 +8,8 @@ import {
   type StartingContext,
 } from '../types/family';
 
-const GENDERS = new Set<Gender>(['male', 'female', 'other', 'unspecified']);
-const PARTNER_TYPES = new Set<PartnerType>([
+export const GENDERS = new Set<Gender>(['male', 'female', 'other', 'unspecified']);
+export const PARTNER_TYPES = new Set<PartnerType>([
   'spouses',
   'partners',
   'co-parents',
@@ -19,14 +19,14 @@ const PARTNER_TYPES = new Set<PartnerType>([
   'unspecified',
   'custom',
 ]);
-const PARENT_CHILD_TYPES = new Set<ParentChildType>([
+export const PARENT_CHILD_TYPES = new Set<ParentChildType>([
   'biological',
   'adopted',
   'step',
   'foster',
   'custom',
 ]);
-const STARTING_CONTEXTS = new Set<StartingContext>([
+export const STARTING_CONTEXTS = new Set<StartingContext>([
   'parents',
   'grandparents',
   'great-grandparents',
@@ -75,7 +75,8 @@ export function validateFamilyTree(input: unknown): ValidationResult {
     errors.push('Tree timestamps are invalid.');
   }
   if (!isRecord(input.people)) errors.push('People collection is invalid.');
-  if (!isRecord(input.partnerRelationships)) errors.push('Partner relationships collection is invalid.');
+  if (!isRecord(input.partnerRelationships))
+    errors.push('Partner relationships collection is invalid.');
   if (!isRecord(input.parentChildRelationships)) {
     errors.push('Parent-child relationships collection is invalid.');
   }
@@ -85,26 +86,39 @@ export function validateFamilyTree(input: unknown): ValidationResult {
   const partnerRelationships = input.partnerRelationships as Record<string, unknown>;
   const parentChildRelationships = input.parentChildRelationships as Record<string, unknown>;
 
+  for (const collection of [people, partnerRelationships, parentChildRelationships]) {
+    for (const key of Object.keys(collection)) {
+      if (!key || ['__proto__', 'prototype', 'constructor'].includes(key)) {
+        errors.push('Record IDs must be nonempty and cannot use reserved object keys.');
+      }
+    }
+  }
+
   for (const [key, raw] of Object.entries(people)) {
     if (!isRecord(raw)) {
       errors.push(`Person ${key} is invalid.`);
       continue;
     }
     if (raw.id !== key || !isString(raw.id, 200)) errors.push(`Person ${key} has an invalid ID.`);
-    if (!isString(raw.name, 200) || !raw.name.trim()) errors.push(`Person ${key} needs a valid name.`);
-    if (!GENDERS.has(raw.gender as Gender)) errors.push(`Person ${key} has an invalid gender value.`);
-    if (!optionalString(raw.birthDate, 10) || !isValidFamilyDate(raw.birthDate as string | undefined)) {
+    if (!isString(raw.name, 200) || !raw.name.trim())
+      errors.push(`Person ${key} needs a valid name.`);
+    if (!GENDERS.has(raw.gender as Gender))
+      errors.push(`Person ${key} has an invalid gender value.`);
+    if (!optionalString(raw.birthDate, 10)) {
       errors.push(`Person ${key} has an invalid birth date.`);
     }
-    if (!optionalString(raw.deathDate, 10) || !isValidFamilyDate(raw.deathDate as string | undefined)) {
+    if (!optionalString(raw.deathDate, 10)) {
       errors.push(`Person ${key} has an invalid death date.`);
     }
-    const birth = comparableDate(raw.birthDate as string | undefined);
-    const death = comparableDate(raw.deathDate as string | undefined);
-    if (birth !== undefined && death !== undefined && death < birth) {
-      errors.push(`Person ${key} has a death date before the birth date.`);
+    if (optionalString(raw.birthDate, 10) && optionalString(raw.deathDate, 10)) {
+      const issue = validateLifeDates(
+        raw.birthDate as string | undefined,
+        raw.deathDate as string | undefined,
+      );
+      if (issue) errors.push(`Person ${key}: ${issue}`);
     }
-    if (!optionalString(raw.notes, 5_000)) errors.push(`Person ${key} has notes that are too long.`);
+    if (!optionalString(raw.notes, 5_000))
+      errors.push(`Person ${key} has notes that are too long.`);
     if (!validTimestamp(raw.createdAt) || !validTimestamp(raw.updatedAt)) {
       errors.push(`Person ${key} has invalid timestamps.`);
     }
@@ -116,19 +130,24 @@ export function validateFamilyTree(input: unknown): ValidationResult {
       errors.push(`Partner relationship ${key} is invalid.`);
       continue;
     }
-    if (raw.id !== key || !isString(raw.id, 200)) errors.push(`Partner relationship ${key} has an invalid ID.`);
+    if (raw.id !== key || !isString(raw.id, 200))
+      errors.push(`Partner relationship ${key} has an invalid ID.`);
     if (!isString(raw.person1Id, 200) || !isString(raw.person2Id, 200)) {
       errors.push(`Partner relationship ${key} has invalid person references.`);
       continue;
     }
-    if (!people[raw.person1Id] || !people[raw.person2Id]) {
+    if (!Object.hasOwn(people, raw.person1Id) || !Object.hasOwn(people, raw.person2Id)) {
       errors.push(`Partner relationship ${key} references a missing person.`);
     }
-    if (raw.person1Id === raw.person2Id) errors.push(`Partner relationship ${key} is self-referential.`);
-    if (!PARTNER_TYPES.has(raw.type as PartnerType)) errors.push(`Partner relationship ${key} has an invalid type.`);
-    if (!optionalString(raw.customLabel, 200)) errors.push(`Partner relationship ${key} has an invalid custom label.`);
-    if (!validTimestamp(raw.createdAt)) errors.push(`Partner relationship ${key} has an invalid timestamp.`);
-    const pair = [raw.person1Id, raw.person2Id].sort().join('::');
+    if (raw.person1Id === raw.person2Id)
+      errors.push(`Partner relationship ${key} is self-referential.`);
+    if (!PARTNER_TYPES.has(raw.type as PartnerType))
+      errors.push(`Partner relationship ${key} has an invalid type.`);
+    if (!optionalString(raw.customLabel, 200))
+      errors.push(`Partner relationship ${key} has an invalid custom label.`);
+    if (!validTimestamp(raw.createdAt))
+      errors.push(`Partner relationship ${key} has an invalid timestamp.`);
+    const pair = JSON.stringify([raw.person1Id, raw.person2Id].sort());
     if (partnerPairs.has(pair)) errors.push(`Duplicate partner relationship detected for ${pair}.`);
     partnerPairs.add(pair);
   }
@@ -140,22 +159,27 @@ export function validateFamilyTree(input: unknown): ValidationResult {
       errors.push(`Parent-child relationship ${key} is invalid.`);
       continue;
     }
-    if (raw.id !== key || !isString(raw.id, 200)) errors.push(`Parent-child relationship ${key} has an invalid ID.`);
+    if (raw.id !== key || !isString(raw.id, 200))
+      errors.push(`Parent-child relationship ${key} has an invalid ID.`);
     if (!isString(raw.parentId, 200) || !isString(raw.childId, 200)) {
       errors.push(`Parent-child relationship ${key} has invalid person references.`);
       continue;
     }
-    if (!people[raw.parentId] || !people[raw.childId]) {
+    if (!Object.hasOwn(people, raw.parentId) || !Object.hasOwn(people, raw.childId)) {
       errors.push(`Parent-child relationship ${key} references a missing person.`);
     }
-    if (raw.parentId === raw.childId) errors.push(`Parent-child relationship ${key} is self-referential.`);
+    if (raw.parentId === raw.childId)
+      errors.push(`Parent-child relationship ${key} is self-referential.`);
     if (!PARENT_CHILD_TYPES.has(raw.type as ParentChildType)) {
       errors.push(`Parent-child relationship ${key} has an invalid type.`);
     }
-    if (!optionalString(raw.customLabel, 200)) errors.push(`Parent-child relationship ${key} has an invalid custom label.`);
-    if (!validTimestamp(raw.createdAt)) errors.push(`Parent-child relationship ${key} has an invalid timestamp.`);
-    const pair = `${raw.parentId}::${raw.childId}`;
-    if (parentChildPairs.has(pair)) errors.push(`Duplicate parent-child relationship detected for ${pair}.`);
+    if (!optionalString(raw.customLabel, 200))
+      errors.push(`Parent-child relationship ${key} has an invalid custom label.`);
+    if (!validTimestamp(raw.createdAt))
+      errors.push(`Parent-child relationship ${key} has an invalid timestamp.`);
+    const pair = JSON.stringify([raw.parentId, raw.childId]);
+    if (parentChildPairs.has(pair))
+      errors.push(`Duplicate parent-child relationship detected for ${pair}.`);
     parentChildPairs.add(pair);
     const children = adjacency.get(raw.parentId) ?? [];
     children.push(raw.childId);
@@ -171,20 +195,17 @@ export function validateFamilyTree(input: unknown): ValidationResult {
 }
 
 function hasCycle(personIds: string[], adjacency: Map<string, string[]>): boolean {
-  const visiting = new Set<string>();
-  const visited = new Set<string>();
-
-  const visit = (id: string): boolean => {
-    if (visiting.has(id)) return true;
-    if (visited.has(id)) return false;
-    visiting.add(id);
-    for (const child of adjacency.get(id) ?? []) {
-      if (visit(child)) return true;
+  const incoming = new Map(personIds.map((id) => [id, 0]));
+  for (const children of adjacency.values()) {
+    for (const child of children) incoming.set(child, (incoming.get(child) ?? 0) + 1);
+  }
+  const queue = [...incoming.keys()].filter((id) => incoming.get(id) === 0);
+  for (let index = 0; index < queue.length; index += 1) {
+    for (const child of adjacency.get(queue[index]!) ?? []) {
+      const count = incoming.get(child)! - 1;
+      incoming.set(child, count);
+      if (count === 0) queue.push(child);
     }
-    visiting.delete(id);
-    visited.add(id);
-    return false;
-  };
-
-  return personIds.some((id) => visit(id));
+  }
+  return queue.length !== incoming.size;
 }

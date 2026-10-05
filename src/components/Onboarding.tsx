@@ -6,7 +6,7 @@ import { EMPTY_PERSON_DRAFT, type PersonDraft } from './personDraft';
 import type { PartnerType, StartingContext } from '../types/family';
 
 export function Onboarding() {
-  const { createTree } = useFamily();
+  const { createTree, storageError } = useFamily();
   const [person1, setPerson1] = useState<PersonDraft>({ ...EMPTY_PERSON_DRAFT });
   const [person2, setPerson2] = useState<PersonDraft>({ ...EMPTY_PERSON_DRAFT });
   const [relationshipType, setRelationshipType] = useState<PartnerType>('spouses');
@@ -28,17 +28,23 @@ export function Onboarding() {
       return;
     }
     if (startingContext === 'custom' && !startingContextCustom.trim()) {
-      setError('Describe who the starting people are relative to you, or choose Prefer not to specify.');
+      setError(
+        'Describe who the starting people are relative to you, or choose Prefer not to specify.',
+      );
       return;
     }
-    createTree({
-      person1,
-      person2,
-      relationshipType,
-      relationshipCustomLabel,
-      startingContext,
-      startingContextCustom,
-    });
+    try {
+      createTree({
+        person1,
+        person2,
+        relationshipType,
+        relationshipCustomLabel,
+        startingContext,
+        startingContextCustom,
+      });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'The tree could not be created.');
+    }
   };
 
   return (
@@ -48,12 +54,22 @@ export function Onboarding() {
           <span className="eyebrow">Private by default · stored in this browser</span>
           <h1 id="welcome-title">Start your family tree anywhere.</h1>
           <p>
-            Begin with any two people—parents, grandparents, older generations, or another pair. Add only the branches you want to record.
+            Begin with any two people—parents, grandparents, older generations, or another pair. Add
+            only the branches you want to record.
           </p>
         </div>
 
         <form onSubmit={submit} noValidate>
-          {error ? <div className="form-error" role="alert">{error}</div> : null}
+          {storageError ? (
+            <div className="form-error" role="alert">
+              {storageError}
+            </div>
+          ) : null}
+          {error ? (
+            <div className="form-error" role="alert">
+              {error}
+            </div>
+          ) : null}
 
           <div className="starter-grid">
             <fieldset className="starter-person">
@@ -69,7 +85,10 @@ export function Onboarding() {
           <div className="setup-meta-grid">
             <label className="field">
               <span>Relationship between them</span>
-              <select value={relationshipType} onChange={(event) => setRelationshipType(event.target.value as PartnerType)}>
+              <select
+                value={relationshipType}
+                onChange={(event) => setRelationshipType(event.target.value as PartnerType)}
+              >
                 <option value="spouses">Spouses</option>
                 <option value="partners">Partners</option>
                 <option value="co-parents">Co-parents</option>
@@ -80,13 +99,22 @@ export function Onboarding() {
             {relationshipType === 'custom' ? (
               <label className="field">
                 <span>Custom relationship</span>
-                <input maxLength={200} value={relationshipCustomLabel} onChange={(event) => setRelationshipCustomLabel(event.target.value)} />
+                <input
+                  maxLength={200}
+                  value={relationshipCustomLabel}
+                  onChange={(event) => setRelationshipCustomLabel(event.target.value)}
+                />
               </label>
             ) : null}
 
             <label className="field">
-              <span>Who are these people relative to you? <em>Optional</em></span>
-              <select value={startingContext} onChange={(event) => setStartingContext(event.target.value as StartingContext)}>
+              <span>
+                Who are these people relative to you? <em>Optional</em>
+              </span>
+              <select
+                value={startingContext}
+                onChange={(event) => setStartingContext(event.target.value as StartingContext)}
+              >
                 <option value="parents">My parents</option>
                 <option value="grandparents">My grandparents</option>
                 <option value="great-grandparents">My great-grandparents</option>
@@ -98,14 +126,23 @@ export function Onboarding() {
             {startingContext === 'custom' ? (
               <label className="field">
                 <span>Custom context</span>
-                <input maxLength={500} value={startingContextCustom} onChange={(event) => setStartingContextCustom(event.target.value)} />
+                <input
+                  maxLength={500}
+                  value={startingContextCustom}
+                  onChange={(event) => setStartingContextCustom(event.target.value)}
+                />
               </label>
             ) : null}
           </div>
 
           <div className="onboarding-footer">
-            <p>Your tree stays on this device unless you export a backup. Clearing site data can remove it.</p>
-            <button className="primary-button" type="submit">Create family tree</button>
+            <p>
+              Your tree stays on this device unless you export a backup. Clearing site data can
+              remove it.
+            </p>
+            <button className="primary-button" type="submit">
+              Create family tree
+            </button>
           </div>
         </form>
       </section>

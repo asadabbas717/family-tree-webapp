@@ -1,5 +1,6 @@
 import { createId } from './id';
 import { normalizeDateInput, validateLifeDates } from './date';
+import { GENDERS, PARTNER_TYPES, PARENT_CHILD_TYPES, STARTING_CONTEXTS } from './validation';
 import {
   SCHEMA_VERSION,
   type CreateTreeInput,
@@ -24,10 +25,14 @@ function now(): string {
 }
 
 export function validatePersonInput(input: PersonInput): string | null {
+  if (!GENDERS.has(input.gender)) return 'Gender is invalid.';
   if (!input.name.trim()) return 'Full name is required.';
   if (input.name.trim().length > 200) return 'Name must be 200 characters or fewer.';
   if ((input.notes?.length ?? 0) > 5_000) return 'Notes must be 5,000 characters or fewer.';
-  return validateLifeDates(normalizeDateInput(input.birthDate), normalizeDateInput(input.deathDate));
+  return validateLifeDates(
+    normalizeDateInput(input.birthDate),
+    normalizeDateInput(input.deathDate),
+  );
 }
 
 export function createPerson(input: PersonInput, timestamp = now()): Person {
@@ -60,6 +65,12 @@ export function createEmptyTree(): FamilyTreeData {
 }
 
 export function createInitialTree(input: CreateTreeInput): FamilyTreeData {
+  if (!STARTING_CONTEXTS.has(input.startingContext))
+    throw new FamilyDomainError('Starting context is invalid.');
+  if ((input.startingContextCustom?.trim().length ?? 0) > 500)
+    throw new FamilyDomainError('Starting context must be 500 characters or fewer.');
+  if (input.startingContext === 'custom' && !input.startingContextCustom?.trim())
+    throw new FamilyDomainError('Describe the custom starting context.');
   const timestamp = now();
   const person1 = createPerson(input.person1, timestamp);
   const person2 = createPerson(input.person2, timestamp);
@@ -92,11 +103,15 @@ function touch(tree: FamilyTreeData): FamilyTreeData {
 
 function requirePerson(tree: FamilyTreeData, id: string): Person {
   const person = tree.people[id];
-  if (!person) throw new FamilyDomainError('The selected family member no longer exists.');
+  if (!Object.hasOwn(tree.people, id) || !person)
+    throw new FamilyDomainError('The selected family member no longer exists.');
   return person;
 }
 
-export function addPerson(tree: FamilyTreeData, input: PersonInput): { tree: FamilyTreeData; person: Person } {
+export function addPerson(
+  tree: FamilyTreeData,
+  input: PersonInput,
+): { tree: FamilyTreeData; person: Person } {
   const person = createPerson(input);
   if (tree.people[person.id]) throw new FamilyDomainError('A duplicate person ID was generated.');
   return {
@@ -128,6 +143,9 @@ export function addPartnerRelationship(
   type: PartnerType,
   customLabel?: string,
 ): FamilyTreeData {
+  if (!PARTNER_TYPES.has(type))
+    throw new FamilyDomainError('Partner relationship type is invalid.');
+  validateRelationshipLabel(type, customLabel);
   requirePerson(tree, person1Id);
   requirePerson(tree, person2Id);
   if (person1Id === person2Id) throw new FamilyDomainError('A person cannot be their own partner.');
@@ -137,7 +155,8 @@ export function addPartnerRelationship(
       (relationship.person1Id === person1Id && relationship.person2Id === person2Id) ||
       (relationship.person1Id === person2Id && relationship.person2Id === person1Id),
   );
-  if (duplicate) throw new FamilyDomainError('These two people already have a partner relationship.');
+  if (duplicate)
+    throw new FamilyDomainError('These two people already have a partner relationship.');
 
   const relationship: PartnerRelationship = {
     id: createId('partner'),
@@ -162,7 +181,9 @@ export function getChildren(tree: FamilyTreeData, parentId: string): Person[] {
       .filter((relationship) => relationship.parentId === parentId)
       .map((relationship) => relationship.childId),
   );
-  return [...ids].map((id) => tree.people[id]).filter((person): person is Person => Boolean(person));
+  return [...ids]
+    .map((id) => tree.people[id])
+    .filter((person): person is Person => Boolean(person));
 }
 
 export function getParents(tree: FamilyTreeData, childId: string): Person[] {
@@ -171,7 +192,9 @@ export function getParents(tree: FamilyTreeData, childId: string): Person[] {
       .filter((relationship) => relationship.childId === childId)
       .map((relationship) => relationship.parentId),
   );
-  return [...ids].map((id) => tree.people[id]).filter((person): person is Person => Boolean(person));
+  return [...ids]
+    .map((id) => tree.people[id])
+    .filter((person): person is Person => Boolean(person));
 }
 
 export function getPartners(tree: FamilyTreeData, personId: string): Person[] {
@@ -180,41 +203,44 @@ export function getPartners(tree: FamilyTreeData, personId: string): Person[] {
     if (relationship.person1Id === personId) ids.add(relationship.person2Id);
     if (relationship.person2Id === personId) ids.add(relationship.person1Id);
   });
-  return [...ids].map((id) => tree.people[id]).filter((person): person is Person => Boolean(person));
+  return [...ids]
+    .map((id) => tree.people[id])
+    .filter((person): person is Person => Boolean(person));
+}
+
+function traverseRelations(
+  tree: FamilyTreeData,
+  personId: string,
+  direction: 'ancestors' | 'descendants',
+): Set<string> {
+  const adjacency = new Map<string, string[]>();
+  for (const relation of Object.values(tree.parentChildRelationships)) {
+    const source = direction === 'descendants' ? relation.parentId : relation.childId;
+    const target = direction === 'descendants' ? relation.childId : relation.parentId;
+    const neighbors = adjacency.get(source) ?? [];
+    neighbors.push(target);
+    adjacency.set(source, neighbors);
+  }
+  const visited = new Set([personId]);
+  const queue = [personId];
+  for (let index = 0; index < queue.length; index += 1) {
+    for (const id of adjacency.get(queue[index]!) ?? []) {
+      if (!visited.has(id)) {
+        visited.add(id);
+        queue.push(id);
+      }
+    }
+  }
+  visited.delete(personId);
+  return visited;
 }
 
 export function getDescendantIds(tree: FamilyTreeData, personId: string): Set<string> {
-  const descendants = new Set<string>();
-  const queue = [personId];
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current) continue;
-    for (const child of getChildren(tree, current)) {
-      if (!descendants.has(child.id)) {
-        descendants.add(child.id);
-        queue.push(child.id);
-      }
-    }
-  }
-  descendants.delete(personId);
-  return descendants;
+  return traverseRelations(tree, personId, 'descendants');
 }
 
 export function getAncestorIds(tree: FamilyTreeData, personId: string): Set<string> {
-  const ancestors = new Set<string>();
-  const queue = [personId];
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current) continue;
-    for (const parent of getParents(tree, current)) {
-      if (!ancestors.has(parent.id)) {
-        ancestors.add(parent.id);
-        queue.push(parent.id);
-      }
-    }
-  }
-  ancestors.delete(personId);
-  return ancestors;
+  return traverseRelations(tree, personId, 'ancestors');
 }
 
 export function wouldCreateCycle(tree: FamilyTreeData, parentId: string, childId: string): boolean {
@@ -229,6 +255,9 @@ export function addParentChildRelationship(
   type: ParentChildType = 'biological',
   customLabel?: string,
 ): FamilyTreeData {
+  if (!PARENT_CHILD_TYPES.has(type))
+    throw new FamilyDomainError('Parent-child relationship type is invalid.');
+  validateRelationshipLabel(type, customLabel);
   requirePerson(tree, parentId);
   requirePerson(tree, childId);
   if (parentId === childId) throw new FamilyDomainError('A person cannot be their own parent.');
@@ -269,6 +298,8 @@ export function addRelative(
     customLabel?: string;
   },
 ): { tree: FamilyTreeData; person: Person } {
+  if (!['child', 'parent', 'partner'].includes(kind))
+    throw new FamilyDomainError('Relative kind is invalid.');
   requirePerson(tree, anchorId);
   const created = addPerson(tree, input);
   let next = created.tree;
@@ -339,7 +370,17 @@ export function hasDescendants(tree: FamilyTreeData, personId: string): boolean 
   return getDescendantIds(tree, personId).size > 0;
 }
 
-export function getVisiblePersonIds(tree: FamilyTreeData, collapsedPersonIds: string[]): Set<string> {
+function validateRelationshipLabel(type: string, label?: string): void {
+  if ((label?.trim().length ?? 0) > 200)
+    throw new FamilyDomainError('Relationship label must be 200 characters or fewer.');
+  if (type === 'custom' && !label?.trim())
+    throw new FamilyDomainError('Describe the custom relationship.');
+}
+
+export function getVisiblePersonIds(
+  tree: FamilyTreeData,
+  collapsedPersonIds: string[],
+): Set<string> {
   const hidden = new Set<string>();
   for (const collapsedId of collapsedPersonIds) {
     if (!tree.people[collapsedId]) continue;

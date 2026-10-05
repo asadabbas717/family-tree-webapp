@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef, type ReactNode } from 'react';
 import {
   addRelative,
   createInitialTree,
@@ -13,21 +7,20 @@ import {
   updatePerson,
 } from '../lib/family';
 import { getBrowserRepository, type LoadResult } from '../lib/storage';
-import type {
-  CreateTreeInput,
-  FamilyTreeData,
-  PersonInput,
-} from '../types/family';
-import {
-  FamilyContext,
-  type AddRelativeOptions,
-  type FamilyContextValue,
-} from './family-context';
+import { validateFamilyTree } from '../lib/validation';
+import type { CreateTreeInput, FamilyTreeData, PersonInput } from '../types/family';
+import { FamilyContext, type AddRelativeOptions, type FamilyContextValue } from './family-context';
 
 export function FamilyProvider({ children }: { children: ReactNode }) {
   const repository = useMemo(() => getBrowserRepository(), []);
-  const initialLoad = useMemo<LoadResult>(() => repository?.load() ?? { status: 'empty' }, [repository]);
-  const initialUi = useMemo(() => repository?.loadUiState() ?? { collapsedPersonIds: [] }, [repository]);
+  const initialLoad = useMemo<LoadResult>(
+    () => repository?.load() ?? { status: 'empty' },
+    [repository],
+  );
+  const initialUi = useMemo(
+    () => repository?.loadUiState() ?? { collapsedPersonIds: [] },
+    [repository],
+  );
 
   const [data, setData] = useState<FamilyTreeData | null>(
     initialLoad.status === 'ok' ? initialLoad.data : null,
@@ -35,8 +28,17 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
   const [loadIssue, setLoadIssue] = useState<Extract<LoadResult, { status: 'corrupt' }> | null>(
     initialLoad.status === 'corrupt' ? initialLoad : null,
   );
-  const [storageError, setStorageError] = useState<string | null>(null);
-  const [collapsedPersonIds, setCollapsedPersonIds] = useState<string[]>(initialUi.collapsedPersonIds);
+  const [storageError, setStorageError] = useState<string | null>(
+    initialLoad.status === 'unavailable' ? initialLoad.error : null,
+  );
+  const currentData = useRef(data);
+  const commit = useCallback((next: FamilyTreeData | null) => {
+    currentData.current = next;
+    setData(next);
+  }, []);
+  const [collapsedPersonIds, setCollapsedPersonIds] = useState<string[]>(
+    initialUi.collapsedPersonIds,
+  );
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [focusRequest, setFocusRequest] = useState(0);
 
@@ -71,17 +73,24 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
     }
   }, [collapsedPersonIds, loadIssue, repository]);
 
-  const createTree = useCallback((input: CreateTreeInput) => {
-    const tree = createInitialTree(input);
-    setData(tree);
-    setLoadIssue(null);
-    setCollapsedPersonIds([]);
-    setSelectedPersonId(Object.keys(tree.people)[0] ?? null);
-  }, []);
+  const createTree = useCallback(
+    (input: CreateTreeInput) => {
+      const tree = createInitialTree(input);
+      commit(tree);
+      setLoadIssue(null);
+      setCollapsedPersonIds([]);
+      setSelectedPersonId(Object.keys(tree.people)[0] ?? null);
+    },
+    [commit],
+  );
 
-  const editPerson = useCallback((personId: string, input: PersonInput) => {
-    setData((current) => (current ? updatePerson(current, personId, input) : current));
-  }, []);
+  const editPerson = useCallback(
+    (personId: string, input: PersonInput) => {
+      if (!currentData.current) throw new Error('Create a family tree first.');
+      commit(updatePerson(currentData.current, personId, input));
+    },
+    [commit],
+  );
 
   const createRelative = useCallback(
     (
@@ -90,46 +99,55 @@ export function FamilyProvider({ children }: { children: ReactNode }) {
       input: PersonInput,
       options?: AddRelativeOptions,
     ) => {
-      if (!data) throw new Error('Create a family tree first.');
-      const result = addRelative(data, anchorId, kind, input, options);
-      setData(result.tree);
+      if (!currentData.current) throw new Error('Create a family tree first.');
+      const result = addRelative(currentData.current, anchorId, kind, input, options);
+      commit(result.tree);
       setCollapsedPersonIds((current) => current.filter((id) => id !== anchorId));
       setSelectedPersonId(result.person.id);
       setFocusRequest((value) => value + 1);
       return result.person.id;
     },
-    [data],
+    [commit],
   );
 
-  const removePerson = useCallback((personId: string) => {
-    setData((current) => (current ? deletePerson(current, personId) : current));
-    setCollapsedPersonIds((current) => current.filter((id) => id !== personId));
-    setSelectedPersonId((current) => (current === personId ? null : current));
-  }, []);
+  const removePerson = useCallback(
+    (personId: string) => {
+      if (!currentData.current) throw new Error('Create a family tree first.');
+      commit(deletePerson(currentData.current, personId));
+      setCollapsedPersonIds((current) => current.filter((id) => id !== personId));
+      setSelectedPersonId((current) => (current === personId ? null : current));
+    },
+    [commit],
+  );
 
-  const replaceTree = useCallback((tree: FamilyTreeData) => {
-    setData(tree);
-    setLoadIssue(null);
-    setCollapsedPersonIds([]);
-    setSelectedPersonId(null);
-  }, []);
+  const replaceTree = useCallback(
+    (tree: FamilyTreeData) => {
+      const result = validateFamilyTree(tree);
+      if (!result.ok) throw new Error(result.errors.slice(0, 5).join(' '));
+      commit(tree);
+      setLoadIssue(null);
+      setCollapsedPersonIds([]);
+      setSelectedPersonId(null);
+    },
+    [commit],
+  );
 
   const resetTree = useCallback(() => {
     repository?.clear();
-    setData(null);
+    commit(null);
     setLoadIssue(null);
     setCollapsedPersonIds([]);
     setSelectedPersonId(null);
     setStorageError(null);
-  }, [repository]);
+  }, [repository, commit]);
 
   const recoverReset = useCallback(() => {
     repository?.clear();
     setLoadIssue(null);
-    setData(null);
+    commit(null);
     setCollapsedPersonIds([]);
     setSelectedPersonId(null);
-  }, [repository]);
+  }, [repository, commit]);
 
   const toggleCollapsed = useCallback((personId: string) => {
     setCollapsedPersonIds((current) =>

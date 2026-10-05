@@ -18,8 +18,18 @@ import { PersonNode } from './PersonNode';
 function FamilyJunctionNode() {
   return (
     <span className="family-junction" aria-hidden="true">
-      <Handle id="junction-target" type="target" position={Position.Top} className="family-handle" />
-      <Handle id="junction-source" type="source" position={Position.Bottom} className="family-handle" />
+      <Handle
+        id="junction-target"
+        type="target"
+        position={Position.Top}
+        className="family-handle"
+      />
+      <Handle
+        id="junction-source"
+        type="source"
+        position={Position.Bottom}
+        className="family-handle"
+      />
     </span>
   );
 }
@@ -32,26 +42,26 @@ interface CanvasInnerProps {
 }
 
 function CanvasInner({ onAddRelative, onEdit }: CanvasInnerProps) {
-  const {
-    data,
-    collapsedPersonIds,
-    selectedPersonId,
-    focusRequest,
-    selectPerson,
-  } = useFamily();
+  const { data, collapsedPersonIds, selectedPersonId, focusRequest, selectPerson } = useFamily();
   const { fitView, setCenter, getNode, zoomIn, zoomOut } = useReactFlow();
 
+  const base = useMemo(
+    () => (data ? buildFlowGraph(data, collapsedPersonIds, null) : { nodes: [], edges: [] }),
+    [data, collapsedPersonIds],
+  );
   const graph = useMemo(() => {
-    const base = data ? buildFlowGraph(data, collapsedPersonIds, selectedPersonId) : { nodes: [], edges: [] };
     return {
       ...base,
       nodes: base.nodes.map((node) =>
         node.type === 'person'
-          ? { ...node, data: { ...node.data, onAddRelative, onEdit } }
+          ? {
+              ...node,
+              data: { ...node.data, onAddRelative, onEdit, selected: node.id === selectedPersonId },
+            }
           : node,
       ),
     };
-  }, [data, collapsedPersonIds, selectedPersonId, onAddRelative, onEdit]);
+  }, [base, selectedPersonId, onAddRelative, onEdit]);
 
   useEffect(() => {
     if (!selectedPersonId || focusRequest === 0) return;
@@ -91,14 +101,25 @@ function CanvasInner({ onAddRelative, onEdit }: CanvasInnerProps) {
         onPaneClick={() => selectPerson(null)}
         proOptions={{ hideAttribution: false }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={24} size={1} className="tree-background" />
+        <Background
+          variant={BackgroundVariant.Dots}
+          gap={24}
+          size={1}
+          className="tree-background"
+        />
         <MiniMap className="tree-minimap" pannable zoomable aria-label="Family tree minimap" />
       </ReactFlow>
 
       <div className="canvas-controls" aria-label="Tree view controls">
-        <button type="button" onClick={() => void zoomIn({ duration: 180 })} aria-label="Zoom in">+</button>
-        <button type="button" onClick={() => void zoomOut({ duration: 180 })} aria-label="Zoom out">−</button>
-        <button type="button" onClick={() => void fitView({ padding: 0.2, duration: 300 })}>Fit tree</button>
+        <button type="button" onClick={() => void zoomIn({ duration: 180 })} aria-label="Zoom in">
+          +
+        </button>
+        <button type="button" onClick={() => void zoomOut({ duration: 180 })} aria-label="Zoom out">
+          −
+        </button>
+        <button type="button" onClick={() => void fitView({ padding: 0.2, duration: 300 })}>
+          Fit tree
+        </button>
         {selectedPersonId ? (
           <button
             type="button"
@@ -107,7 +128,10 @@ function CanvasInner({ onAddRelative, onEdit }: CanvasInnerProps) {
               if (!node) return;
               const width = node.measured?.width ?? node.width ?? 244;
               const height = node.measured?.height ?? node.height ?? 252;
-              void setCenter(node.position.x + width / 2, node.position.y + height / 2, { zoom: 1.1, duration: 300 });
+              void setCenter(node.position.x + width / 2, node.position.y + height / 2, {
+                zoom: 1.1,
+                duration: 300,
+              });
             }}
           >
             Center selected
