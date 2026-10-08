@@ -4,9 +4,9 @@ A browser-local interactive family tree for recording only the branches a user c
 
 ## Screenshots
 
-- Desktop tree canvas — `docs/screenshots/desktop-tree.png`
-- Mobile family details — `docs/screenshots/mobile-details.png`
-- First-run setup — `docs/screenshots/onboarding.png`
+[Recorded tree preview](docs/screenshots/audit-tree.png)
+
+Desktop, mobile and onboarding captures are not currently included.
 
 ## Features
 
